@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import random
 import socket
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from .net import iter_json_messages, send_json
@@ -24,7 +25,6 @@ class Player:
 class RoundState:
     question: Question
     winner_username: str | None = None
-    answered_usernames: set[str] = field(default_factory=set)
 
 
 class TriviaServer:
@@ -49,6 +49,9 @@ class TriviaServer:
         self._players: dict[socket.socket, Player] = {}
         self._round: RoundState | None = None
         self._shutdown = threading.Event()
+        self._game_started = False
+        self._game_finished = False
+        self._start_requested = False
 
     def _broadcast(self, message: dict[str, Any]) -> None:
         dead: list[socket.socket] = []
@@ -68,6 +71,19 @@ class TriviaServer:
     def _broadcast_leaderboard(self) -> None:
         self._broadcast({"type": "leaderboard", "scores": self._leaderboard_payload()})
 
+    def _lobby_payload(self) -> dict[str, Any]:
+        players = sorted((p.username for p in self._players.values()), key=str.lower)
+        return {
+            "type": "lobby_update",
+            "players": players,
+            "started": self._game_started,
+            "can_start": len(players) >= 1 and not self._game_started,
+            "min_players": self.min_players_to_start,
+        }
+
+    def _broadcast_lobby_state(self) -> None:
+        self._broadcast(self._lobby_payload())
+
     def _remove_player_socket(self, sock: socket.socket, *, reason: str) -> None:
         with self._lock:
             player = self._players.pop(sock, None)
@@ -80,6 +96,17 @@ class TriviaServer:
         print(f"[LEAVE] {player.username} ({player.addr[0]}:{player.addr[1]}) reason={reason}")
         self._broadcast({"type": "player_left", "username": player.username, "reason": reason})
         self._broadcast_leaderboard()
+        self._broadcast_lobby_state()
+
+    def _on_start_game_request(self, username: str) -> None:
+        with self._lock:
+            if self._game_started:
+                return
+            if len(self._players) < 1:
+                return
+            self._start_requested = True
+        self._broadcast({"type": "info", "message": f"{username} started the game."})
+        self._broadcast_lobby_state()
 
     def _handle_client(self, client_sock: socket.socket, addr: tuple[str, int]) -> None:
         client_sock.settimeout(None)
@@ -110,12 +137,20 @@ class TriviaServer:
             self._broadcast({"type": "player_joined", "username": username})
             self._broadcast_leaderboard()
             print(f"[JOIN] {username} ({addr[0]}:{addr[1]})")
+            with self._lock:
+                started = self._game_started
+            if started:
+                send_json(client_sock, {"type": "info", "message": "Match in progress. Waiting for next question."})
+            else:
+                self._broadcast_lobby_state()
 
             for msg in msg_iter:
                 if not isinstance(msg, dict):
                     continue
                 if msg.get("type") == "answer":
                     self._on_answer(username, msg)
+                elif msg.get("type") == "start_game":
+                    self._on_start_game_request(username)
                 elif msg.get("type") == "quit":
                     raise ConnectionError("Client quit")
         except (ConnectionError, StopIteration, OSError, ValueError) as e:
@@ -142,10 +177,6 @@ class TriviaServer:
             if now < player.cooldown_until:
                 return
             player.cooldown_until = now + self.cooldown_s
-
-            if username in round_state.answered_usernames:
-                return
-            round_state.answered_usernames.add(username)
 
             if round_state.winner_username is not None:
                 return
@@ -203,56 +234,88 @@ class TriviaServer:
             t.start()
 
     def _game_loop(self) -> None:
-        question_index = 0
+        # Shuffle once so question order is random but without repeats.
+        question_order = list(QUESTIONS)
+        random.shuffle(question_order)
+
         while not self._shutdown.is_set():
             with self._lock:
+                game_started = self._game_started
+                game_finished = self._game_finished
+                start_requested = self._start_requested
                 player_count = len(self._players)
-            if player_count < self.min_players_to_start:
+
+            if game_finished:
+                # Keep server and clients connected after game-over.
                 time.sleep(0.2)
                 continue
 
-            q = QUESTIONS[question_index % len(QUESTIONS)]
-            question_index += 1
-
-            with self._lock:
-                self._round = RoundState(question=q)
-
-            self._broadcast(
-                {
-                    "type": "question",
-                    "question_id": q.id,
-                    "text": q.text,
-                    "options": q.options,
-                    "timeout_s": self.answer_timeout_s,
-                }
-            )
-
-            deadline = time.time() + self.answer_timeout_s
-            while time.time() < deadline and not self._shutdown.is_set():
-                with self._lock:
-                    winner = self._round.winner_username if self._round else None
-                if winner:
-                    break
-                time.sleep(0.05)
-
-            with self._lock:
-                round_state = self._round
-                self._round = None
-
-            if not round_state:
+            if not game_started:
+                # Lobby phase: wait for someone to press start.
+                if player_count >= 1 and start_requested:
+                    with self._lock:
+                        self._game_started = True
+                    self._broadcast({"type": "game_started"})
+                    self._broadcast({"type": "info", "message": "Game started."})
+                    continue
+                time.sleep(0.2)
                 continue
 
-            correct_letter = ["A", "B", "C", "D"][round_state.question.answer_index]
+            for q in question_order:
+                with self._lock:
+                    self._round = RoundState(question=q)
+
+                self._broadcast(
+                    {
+                        "type": "question",
+                        "question_id": q.id,
+                        "text": q.text,
+                        "options": q.options,
+                        "timeout_s": self.answer_timeout_s,
+                    }
+                )
+
+                deadline = time.time() + self.answer_timeout_s
+                while time.time() < deadline and not self._shutdown.is_set():
+                    with self._lock:
+                        winner = self._round.winner_username if self._round else None
+                    if winner:
+                        break
+                    time.sleep(0.05)
+
+                with self._lock:
+                    round_state = self._round
+                    self._round = None
+
+                if not round_state:
+                    continue
+
+                correct_letter = ["A", "B", "C", "D"][round_state.question.answer_index]
+                self._broadcast(
+                    {
+                        "type": "round_result",
+                        "question_id": round_state.question.id,
+                        "winner": round_state.winner_username,
+                        "correct": correct_letter,
+                        "scores": self._leaderboard_payload(),
+                    }
+                )
+                time.sleep(self.inter_round_pause_s)
+
+            final_scores = self._leaderboard_payload()
+            top_score = max(final_scores.values(), default=0)
+            winners = [name for name, score in final_scores.items() if score == top_score]
             self._broadcast(
                 {
-                    "type": "round_result",
-                    "question_id": round_state.question.id,
-                    "winner": round_state.winner_username,
-                    "correct": correct_letter,
-                    "scores": self._leaderboard_payload(),
+                    "type": "game_over",
+                    "scores": final_scores,
+                    "winners": winners,
                 }
             )
-            time.sleep(self.inter_round_pause_s)
+            print("[GAME OVER] All questions asked.")
+            self._broadcast_leaderboard()
+            with self._lock:
+                self._game_finished = True
 
 
 def main() -> None:

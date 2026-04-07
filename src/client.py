@@ -41,6 +41,8 @@ class TriviaClientApp:
         self.status_var = tk.StringVar(value="Not connected")
         tk.Label(top, textvariable=self.status_var, anchor="w").pack(side="left", fill="x", expand=True)
 
+        self.start_btn = tk.Button(top, text="Start Game", command=self.start_game, state="disabled")
+        self.start_btn.pack(side="right", padx=(0, 8))
         self.connect_btn = tk.Button(top, text="Connect", command=self.connect)
         self.connect_btn.pack(side="right")
 
@@ -88,6 +90,7 @@ class TriviaClientApp:
             self.status_var.set(f"Connected as {self.username} → {self.host}:{self.port}")
         else:
             self.connect_btn.config(state="normal")
+            self.start_btn.config(state="disabled")
             self.status_var.set("Not connected")
             self.current_question_id = None
             self._set_answer_buttons_enabled(False)
@@ -113,7 +116,15 @@ class TriviaClientApp:
         self.rx_thread = threading.Thread(target=self._rx_loop, daemon=True)
         self.rx_thread.start()
         self._set_connected(True)
-        self.info_var.set("Waiting for the next question…")
+        self.info_var.set("Connected. Waiting in lobby...")
+
+    def start_game(self) -> None:
+        if not self.sock:
+            return
+        try:
+            send_json(self.sock, {"type": "start_game"})
+        except OSError:
+            pass
 
     def _rx_loop(self) -> None:
         assert self.sock is not None
@@ -180,8 +191,29 @@ class TriviaClientApp:
             self._update_leaderboard(msg.get("scores") or {})
             return
 
+        if mtype == "lobby_update":
+            players = msg.get("players") or []
+            can_start = bool(msg.get("can_start"))
+            started = bool(msg.get("started"))
+            if started:
+                self.start_btn.config(state="disabled")
+            else:
+                self.start_btn.config(state="normal" if can_start else "disabled")
+                names = ", ".join(str(p) for p in players) if players else "(none)"
+                self.question_var.set("Lobby")
+                self.info_var.set(
+                    f"Players in lobby ({len(players)}): {names}. Any player can press Start Game."
+                )
+            return
+
         if mtype == "info":
             self.info_var.set(str(msg.get("message", "")))
+            return
+
+        if mtype == "game_started":
+            self.start_btn.config(state="disabled")
+            self.question_var.set("Game in progress")
+            self.info_var.set("Game started. Waiting for question...")
             return
 
         if mtype == "question":
@@ -209,6 +241,20 @@ class TriviaClientApp:
             self._update_leaderboard(scores)
             return
 
+        if mtype == "game_over":
+            winners = msg.get("winners") or []
+            scores = msg.get("scores") or {}
+            board_lines = self._format_leaderboard_lines(scores)
+            if winners:
+                self.info_var.set(f"Game over. Winner(s): {', '.join(str(w) for w in winners)}.")
+            else:
+                self.info_var.set("Game over.")
+            self.question_var.set("Final Leaderboard:\n" + ("\n".join(board_lines) if board_lines else "(no players)"))
+            self.current_question_id = None
+            self._set_answer_buttons_enabled(False)
+            self._update_leaderboard(scores)
+            return
+
     def _update_leaderboard(self, scores: dict[str, Any]) -> None:
         lines = []
         for i, (name, score) in enumerate(scores.items(), start=1):
@@ -219,6 +265,12 @@ class TriviaClientApp:
         self.leader_text.delete("1.0", "end")
         self.leader_text.insert("1.0", text)
         self.leader_text.config(state="disabled")
+
+    def _format_leaderboard_lines(self, scores: dict[str, Any]) -> list[str]:
+        lines = []
+        for i, (name, score) in enumerate(scores.items(), start=1):
+            lines.append(f"{i:>2}. {name}: {score}")
+        return lines
 
     def _disconnect_local(self) -> None:
         if self.sock:
