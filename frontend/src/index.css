@@ -1,0 +1,295 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #111111;
+  background: #f3f3ef;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(circle at top, rgba(255,255,255,0.96), rgba(243,243,239,1) 45%),
+    #f3f3ef;
+  color: #111111;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: none;
+}
+
+.appShell {
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.topBar {
+  max-width: 1180px;
+  margin: 0 auto 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.topMeta {
+  color: #6b6b6b;
+  font-size: 0.95rem;
+}
+
+.mainWrap {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.panel {
+  background: rgba(255,255,255,0.76);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(17,17,17,0.08);
+  border-radius: 30px;
+  padding: 34px;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.05);
+}
+
+.hero {
+  max-width: 760px;
+  margin: 72px auto 0;
+  text-align: center;
+}
+
+.eyebrow {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7a7a7a;
+  margin-bottom: 12px;
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+}
+
+h1 {
+  font-size: clamp(2.8rem, 6vw, 5.4rem);
+  line-height: 0.94;
+}
+
+h2 {
+  font-size: clamp(1.7rem, 3vw, 2.5rem);
+  line-height: 1.02;
+}
+
+.subtext {
+  margin-top: 14px;
+  color: #666666;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.joinRow {
+  margin-top: 28px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.input {
+  width: 320px;
+  max-width: 100%;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(17,17,17,0.1);
+  background: rgba(255,255,255,0.96);
+  outline: none;
+  color: #111111;
+}
+
+.input:focus {
+  border-color: rgba(17,17,17,0.2);
+}
+
+.primaryButton {
+  background: #111111;
+  color: #ffffff;
+  padding: 16px 22px;
+  border-radius: 18px;
+  cursor: pointer;
+  transition: transform 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease;
+}
+
+.primaryButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.12);
+}
+
+.primaryButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.statusLine {
+  margin-top: 18px;
+  color: #6b6b6b;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #bdbdbd;
+}
+
+.dot.live {
+  background: #111111;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.pillGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.pill {
+  padding: 12px 16px;
+  border-radius: 999px;
+  background: rgba(17,17,17,0.05);
+  border: 1px solid rgba(17,17,17,0.06);
+}
+
+.gameLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.85fr);
+  gap: 20px;
+}
+
+.answerGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 26px;
+}
+
+.answerButton {
+  background: rgba(255,255,255,0.96);
+  border: 1px solid rgba(17,17,17,0.08);
+  border-radius: 22px;
+  padding: 18px;
+  text-align: left;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  color: #111111;
+}
+
+.answerButton:hover {
+  transform: translateY(-2px);
+  border-color: rgba(17,17,17,0.14);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.06);
+}
+
+.answerLetter {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(17,17,17,0.06);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.leaderboardCard {
+  background: rgba(255,255,255,0.76);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(17,17,17,0.08);
+  border-radius: 30px;
+  padding: 24px;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.05);
+  align-self: start;
+}
+
+.leaderboardList {
+  margin-top: 8px;
+}
+
+.leaderRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(17,17,17,0.06);
+}
+
+.leaderRow:last-child {
+  border-bottom: none;
+}
+
+.muted {
+  color: #777777;
+}
+
+@media (max-width: 900px) {
+  .gameLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .answerGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .topBar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+.answerButtonActive {
+  border-color: rgba(17,17,17,0.22);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+}
+
+.endActions {
+  margin-top: 28px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
