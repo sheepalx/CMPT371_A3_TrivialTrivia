@@ -1,0 +1,2 @@
+"""TrivialTrivia package."""
+
