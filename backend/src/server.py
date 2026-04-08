@@ -36,7 +36,7 @@ class TriviaServer:
         min_players_to_start: int = 1,
         answer_timeout_s: float = 12.0,
         inter_round_pause_s: float = 2.0,
-        cooldown_s: float = 2.0,
+        cooldown_s: float = 0.25,
     ) -> None:
         self.host = host
         self.port = port
@@ -55,7 +55,7 @@ class TriviaServer:
 
     def _broadcast(self, message: dict[str, Any]) -> None:
         dead: list[socket.socket] = []
-        for s, p in list(self._players.items()):
+        for s in list(self._players.keys()):
             try:
                 send_json(s, message)
             except OSError:
@@ -64,7 +64,6 @@ class TriviaServer:
             self._remove_player_socket(s, reason="disconnected")
 
     def _leaderboard_payload(self) -> dict[str, int]:
-        # sorted for stable display client-side
         scores = {p.username: p.score for p in self._players.values()}
         return dict(sorted(scores.items(), key=lambda kv: (-kv[1], kv[0].lower())))
 
@@ -77,7 +76,7 @@ class TriviaServer:
             "type": "lobby_update",
             "players": players,
             "started": self._game_started,
-            "can_start": len(players) >= 1 and not self._game_started,
+            "can_start": len(players) >= self.min_players_to_start and not self._game_started,
             "min_players": self.min_players_to_start,
         }
 
@@ -87,12 +86,15 @@ class TriviaServer:
     def _remove_player_socket(self, sock: socket.socket, *, reason: str) -> None:
         with self._lock:
             player = self._players.pop(sock, None)
+
         if not player:
             return
+
         try:
             sock.close()
         except OSError:
             pass
+
         print(f"[LEAVE] {player.username} ({player.addr[0]}:{player.addr[1]}) reason={reason}")
         self._broadcast({"type": "player_left", "username": player.username, "reason": reason})
         self._broadcast_leaderboard()
@@ -102,43 +104,45 @@ class TriviaServer:
         with self._lock:
             if self._game_started:
                 return
-            if len(self._players) < 1:
+            if len(self._players) < self.min_players_to_start:
                 return
             self._start_requested = True
+
         self._broadcast({"type": "info", "message": f"{username} started the game."})
         self._broadcast_lobby_state()
 
     def _handle_client(self, client_sock: socket.socket, addr: tuple[str, int]) -> None:
         client_sock.settimeout(None)
         username: str | None = None
+
         try:
-            # First message must be hello.
             msg_iter = iter_json_messages(client_sock)
             first = next(msg_iter)
+
             if not isinstance(first, dict) or first.get("type") != "hello":
                 send_json(client_sock, {"type": "error", "message": "Expected hello"})
                 raise ConnectionError("Bad handshake")
+
             username = str(first.get("username") or "").strip()
+
             if not username:
                 send_json(client_sock, {"type": "error", "message": "Username required"})
                 raise ConnectionError("Missing username")
 
             with self._lock:
                 if any(p.username.lower() == username.lower() for p in self._players.values()):
-                    send_json(
-                        client_sock,
-                        {"type": "error", "message": "Username already taken"},
-                    )
+                    send_json(client_sock, {"type": "error", "message": "Username already taken"})
                     raise ConnectionError("Duplicate username")
+
                 player = Player(username=username, sock=client_sock, addr=addr)
                 self._players[client_sock] = player
+                started = self._game_started
 
             send_json(client_sock, {"type": "welcome", "username": username})
             self._broadcast({"type": "player_joined", "username": username})
             self._broadcast_leaderboard()
             print(f"[JOIN] {username} ({addr[0]}:{addr[1]})")
-            with self._lock:
-                started = self._game_started
+
             if started:
                 send_json(client_sock, {"type": "info", "message": "Match in progress. Waiting for next question."})
             else:
@@ -147,16 +151,19 @@ class TriviaServer:
             for msg in msg_iter:
                 if not isinstance(msg, dict):
                     continue
+
                 if msg.get("type") == "answer":
                     self._on_answer(username, msg)
                 elif msg.get("type") == "start_game":
                     self._on_start_game_request(username)
                 elif msg.get("type") == "quit":
                     raise ConnectionError("Client quit")
+
         except (ConnectionError, StopIteration, OSError, ValueError) as e:
             reason = "disconnected"
             if str(e):
                 reason = str(e)
+
             if username is not None:
                 self._remove_player_socket(client_sock, reason=reason)
             else:
@@ -167,22 +174,25 @@ class TriviaServer:
 
     def _on_answer(self, username: str, msg: dict[str, Any]) -> None:
         now = time.time()
+        winner_username: str | None = None
+        wrong_sock: socket.socket | None = None
+
         with self._lock:
             round_state = self._round
             player = next((p for p in self._players.values() if p.username == username), None)
+
             if not round_state or not player:
                 return
-
-            # Cooldown applies whenever they attempt an answer.
-            if now < player.cooldown_until:
-                return
-            player.cooldown_until = now + self.cooldown_s
 
             if round_state.winner_username is not None:
                 return
 
+            if now < player.cooldown_until:
+                return
+
             qid = msg.get("question_id")
             value = str(msg.get("value") or "").strip().upper()
+
             if qid != round_state.question.id:
                 return
 
@@ -193,13 +203,19 @@ class TriviaServer:
             if option_map[value] == round_state.question.answer_index:
                 round_state.winner_username = username
                 player.score += 1
-                winner = username
+                winner_username = username
             else:
-                winner = None
+                player.cooldown_until = now + self.cooldown_s
+                wrong_sock = player.sock
 
-        if winner:
+        if winner_username:
             self._broadcast_leaderboard()
-            self._broadcast({"type": "info", "message": f"{winner} answered correctly!"})
+            self._broadcast({"type": "info", "message": f"{winner_username} answered correctly!"})
+        elif wrong_sock:
+            try:
+                send_json(wrong_sock, {"type": "info", "message": "Wrong answer. Try again."})
+            except OSError:
+                pass
 
     def serve_forever(self) -> None:
         server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -230,11 +246,11 @@ class TriviaServer:
                 client_sock, addr = server_sock.accept()
             except OSError:
                 break
+
             t = threading.Thread(target=self._handle_client, args=(client_sock, addr), daemon=True)
             t.start()
 
     def _game_loop(self) -> None:
-        # Shuffle once so question order is random but without repeats.
         question_order = list(QUESTIONS)
         random.shuffle(question_order)
 
@@ -246,24 +262,25 @@ class TriviaServer:
                 player_count = len(self._players)
 
             if game_finished:
-                # Keep server and clients connected after game-over.
                 time.sleep(0.2)
                 continue
 
             if not game_started:
-                # Lobby phase: wait for someone to press start.
-                if player_count >= 1 and start_requested:
+                if player_count >= self.min_players_to_start and start_requested:
                     with self._lock:
                         self._game_started = True
                     self._broadcast({"type": "game_started"})
                     self._broadcast({"type": "info", "message": "Game started."})
                     continue
+
                 time.sleep(0.2)
                 continue
 
             for q in question_order:
                 with self._lock:
                     self._round = RoundState(question=q)
+                    for p in self._players.values():
+                        p.cooldown_until = 0.0
 
                 self._broadcast(
                     {
@@ -300,11 +317,13 @@ class TriviaServer:
                         "scores": self._leaderboard_payload(),
                     }
                 )
+
                 time.sleep(self.inter_round_pause_s)
 
             final_scores = self._leaderboard_payload()
             top_score = max(final_scores.values(), default=0)
             winners = [name for name, score in final_scores.items() if score == top_score]
+
             self._broadcast(
                 {
                     "type": "game_over",
@@ -314,6 +333,7 @@ class TriviaServer:
             )
             print("[GAME OVER] All questions asked.")
             self._broadcast_leaderboard()
+
             with self._lock:
                 self._game_finished = True
 
