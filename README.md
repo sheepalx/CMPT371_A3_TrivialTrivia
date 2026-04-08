@@ -66,7 +66,7 @@ You must open three separate terminals.
 
 Terminal 1 Backend  
 
-cd backend  
+cd ../backend  
 python -m src.server  
 
 Expected output  
