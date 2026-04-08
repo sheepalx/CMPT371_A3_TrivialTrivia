@@ -1,6 +1,7 @@
 # CMPT 371 Assignment 3 — TrivialTrivia
 
 Calvin Weng (301556001) dyw7@sfu.ca
+
 Alex Jiang (301566792) aja102@sfu.ca 
 
 ---
