@@ -1,7 +1,7 @@
 # CMPT 371 Assignment 3 — TrivialTrivia
 
-Calvin Weng (301556001)  
-Alex Jiang (301566792)
+Calvin Weng (301556001) dyw7@sfu.ca
+Alex Jiang (301566792) aja102@sfu.ca 
 
 ---
 
@@ -77,6 +77,8 @@ npm install
 
 You must open **three separate terminals** and keep all three components running.
 
+Starting from the root of the repository:
+
 ### Terminal 1. Backend
 
 ```bash
@@ -126,8 +128,7 @@ Create more concurrent users by reclicking on the link.
 4. Start the game.
 5. Answer questions by selecting options.
 6. View round results and leaderboard updates.
-7. At the end of the game, view final winners.
-8. Restart the game from the end screen.
+7. At the end of the game, view final winners and scores.
 
 ---
 
