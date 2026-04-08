@@ -1,142 +1,121 @@
-CMPT 371 Assignment 3  
-TrivialTrivia  
+# CMPT 371 Assignment 3 — TrivialTrivia
 
-Calvin Weng 301556001  
-Alex Jiang 301566792  
+**Authors**
+- Calvin Weng (301556001)
+- Alex Jiang (301566792)
 
-Project Overview  
+## Overview
 
-TrivialTrivia is a real-time multiplayer trivia game. Players join a lobby, start a game, answer questions, and receive scores based on correctness. The system uses a Python TCP backend, a Node.js bridge server, and a React frontend.
+TrivialTrivia is a real-time multiplayer trivia game. Players join a lobby, start a game, answer questions, and receive scores based on correctness.
 
-The backend handles game logic and player state. The bridge connects the frontend to the backend using WebSockets. The frontend provides an interactive interface for users.
+**Architecture**
+- **Backend**: Python TCP server (game logic + player state)
+- **Bridge**: Node.js server (WebSocket ↔ TCP relay)
+- **Frontend**: React (interactive UI)
 
-Video Demo  
+## Video demo
 
-https://youtu.be/GDl-JiDYjak  
+`https://youtu.be/GDl-JiDYjak`
 
----
+## Requirements
 
-System Requirements  
+- Node.js 18+
+- Python 3.10+
+- npm (bundled with Node.js)
 
-The following must be installed before running the project  
+## Installation
 
-Node.js version 18 or higher  
-Python version 3.10 or higher  
-npm (comes with Node.js)  
+### 1) Clone the repository
 
----
+```bash
+git clone https://github.com/sheepalx/CMPT371_A3_TrivialTrivia.git
+cd CMPT371_A3_TrivialTrivia
+```
 
-Installation Guide  
+### 2) Backend setup
 
-Step 1. Clone the repository  
+No external Python libraries are required.
 
-git clone https://github.com/sheepalx/CMPT371_A3_TrivialTrivia.git  
-cd CMPT371_A3_TrivialTrivia  
+### 3) Bridge setup
 
----
+```bash
+cd bridge
+npm install
+```
 
-Step 2. Backend setup  
+Note: `node_modules` is not included in the repository. Running `npm install` will generate it automatically.
 
-No external libraries are required.  
+### 4) Frontend setup
 
----
+```bash
+cd ../frontend
+npm install
+```
 
-Step 3. Bridge setup  
+## Running the application
 
-cd bridge  
-npm install  
+You must run **three components** in **three separate terminals**.
 
-Note  
-node_modules is not included in the repository. npm install will generate it automatically.  
+### Terminal 1 — Backend (Python TCP server)
 
----
+```bash
+cd backend
+python -m src.server
+```
 
-Step 4. Frontend setup  
+Expected output:
 
-cd ../frontend  
-npm install  
+```text
+Server listening on 127.0.0.1:5555
+```
 
----
+### Terminal 2 — Bridge (Node.js WebSocket server)
 
-Running the Application  
+```bash
+cd bridge
+node server.js
+```
 
-You must open three separate terminals.
+Expected output:
 
----
+```text
+Bridge running on http://localhost:8080
+```
 
-Terminal 1 Backend  
+### Terminal 3 — Frontend (React dev server)
 
-cd ../backend  
-python -m src.server  
+```bash
+cd frontend
+npm run dev
+```
 
-Expected output  
+Open the app in your browser:
 
-Server listening on 127.0.0.1:5555  
+`http://localhost:5173`
 
----
+Add other concurrent players by reclicking on the link.
 
-Terminal 2 Bridge  
+## How to use
 
-cd bridge  
-node server.js  
+1. Open the frontend in your browser.
+2. Enter a username to join the game.
+3. Add players to the lobby by reclicking on the link.
+4. Start the game.
+5. Answer questions by selecting options.
+6. View round results and leaderboard updates.
+7. At the end of the game, view the final winners.
+8. Restart the game from the end screen.
 
-Expected output  
+## Notes
 
-Bridge running on http://localhost:8080  
+- This repository does not include `node_modules` or build/cache artifacts; install dependencies with `npm install`.
+- All three components (**backend**, **bridge**, **frontend**) must be running at the same time for the game to function.
 
----
+## Project structure
 
-Terminal 3 Frontend  
-
-cd frontend  
-npm run dev  
-
-Open your browser and go to  
-
-http://localhost:5173  
-
----
-
-How to Use  
-
-1. Open the frontend in your browser  
-2. Enter a username to join the game  
-3. Wait in the lobby until enough players join  
-4. Start the game  
-5. Answer questions by selecting options  
-6. View round results and leaderboard updates  
-7. At the end of the game, view final winners  
-8. Restart the game from the end screen  
-
----
-
-Notes  
-
-The repository does not include node_modules or cache files. All dependencies are installed using npm install.  
-
-The system requires three running components  
-backend server  
-bridge server  
-frontend application  
-
-All components must be running at the same time for the game to function properly.  
-
----
-
-Project Structure  
-
-backend/  
-Contains Python TCP server and game logic  
-
-bridge/  
-Contains Node.js server that connects frontend and backend  
-
-frontend/  
-Contains React application for the user interface  
-
-README.md  
-Instructions for setup and execution  
-
----
-
-End of README  
+```text
+backend/    Python TCP server and game logic
+bridge/     Node.js bridge (WebSocket ↔ TCP)
+frontend/   React frontend
+README.md   Setup and run instructions
+```
