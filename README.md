@@ -166,28 +166,28 @@ Optional/utility events:
 ## System Limitations & Edge Cases
 
 Handling Multiple Clients Concurrently:
-Solution: We use Python's threading module with one thread per connected client. This allows multiple players to stay connected and submit answers concurrently while the game loop continues to broadcast rounds.
+We use Python's threading module with one thread per connected client. This allows multiple players to stay connected and submit answers concurrently while the game loop continues to broadcast rounds.
 Limitation: Thread-per-client is limited by host resources. A production design would likely use asyncio or a worker/thread pool architecture.
 
 TCP Stream Buffering:
-Solution: TCP is a continuous byte stream, so we implemented newline-delimited JSON framing (\n) in both client and server. This ensures each payload is processed as a complete message.
+TCP is a continuous byte stream, so we implemented newline-delimited JSON framing (\n) in both client and server. This ensures each payload is processed as a complete message.
 
 Input Validation & Security:
-Solution: The server validates message type, answer format (A/B/C/D), and question ID before awarding points. Score updates are guarded by a lock to avoid race conditions when answers arrive nearly simultaneously.
+The server validates message type, answer format (A/B/C/D), and question ID before awarding points. Score updates are guarded by a lock to avoid race conditions when answers arrive nearly simultaneously.
 Limitation: This assignment-level implementation does not include authentication, encryption, or anti-cheat protections against a modified custom client.
 
 Graceful Exit Handling:
-Solution: Server-side try/except around each client handler detects disconnects and removes players cleanly from active state. Updated leaderboard/player state is then broadcast to remaining players.
+Server-side try/except around each client handler detects disconnects and removes players cleanly from active state. Updated leaderboard/player state is then broadcast to remaining players.
 
 Answer Cooldown:
-Solution: After each answer attempt, a player enters a short cooldown period (2 seconds) where additional answers are ignored. This is enforced on the server and mirrored on the GUI client.
+After each answer attempt, a player enters a short cooldown period (2 seconds) where additional answers are ignored. This is enforced on the server and mirrored on the GUI client.
 
 ---
 
 ## Academic Integrity & References
 
 Code Origin:
-The socket communication approach follows standard TCP examples that can be found online. 
+The socket communication approach follows standard TCP examples that can be found online in python socket documentation (listed below). 
 The core game loop, JSON protocol handling, TCP networking logic, leaderboard logic, and class and method implementations were written by our group.
 
 GenAI Usage:
@@ -201,5 +201,4 @@ Google Gemini
 Python Socket Programming HOWTO - https://docs.python.org/3/howto/sockets.html 
 Real Python: Intro to Python Threading - https://realpython.com/intro-to-python-threading/
 React documentation - https://react.dev/
-## Project Structure
 
